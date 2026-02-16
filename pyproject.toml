@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wingxtra-de-telemetry-plugin"
+version = "0.1.0"
+description = "Wingxtra DroneEngage telemetry sender"
+readme = "README.md"
+requires-python = ">=3.10"
+
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["wingxtra_plugin*"]
