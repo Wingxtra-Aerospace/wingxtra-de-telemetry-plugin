@@ -1,15 +1,14 @@
 # Wingxtra DroneEngage Telemetry Plugin
 
-Drone-side Python service that reads telemetry (DroneEngage DataBus or simulation mode), maps it into the Wingxtra telemetry schema, and posts updates to the fleet API.
+Drone-side Python service that reads telemetry from DroneEngage DataBus (or simulation mode), maps it into the Wingxtra telemetry schema, and posts updates to the Fleet API.
 
 ## Build
 
 ```bash
-python -m pip install --upgrade build
-python -m build
+python -m pip wheel . -w dist --no-build-isolation
 ```
 
-## Run
+## Run (simulation mode)
 
 ```bash
 export DRONE_ID=WX-DRN-001
@@ -18,6 +17,20 @@ export API_KEY=secret
 export SIMULATE=true
 python main.py
 ```
+
+## Run (DroneEngage DataBus mode)
+
+```bash
+export DRONE_ID=WX-DRN-001
+export API_URL=https://yourdomain.com/api/v1/telemetry
+export API_KEY=secret
+export SIMULATE=false
+python main.py
+```
+
+Notes:
+- In non-simulate mode the plugin expects the official `droneengage_databus` Python client/template to be installed/available.
+- API authentication uses `X-API-Key: <API_KEY>`.
 
 ## Environment variables
 

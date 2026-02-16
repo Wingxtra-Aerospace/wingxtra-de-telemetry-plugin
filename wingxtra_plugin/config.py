@@ -16,6 +16,8 @@ class Config:
     offline_backoff_seconds: float = 1.0
     log_level: str = "INFO"
     simulate: bool = False
+    de_module_name: str = "wingxtra_de_telemetry"
+    de_subscriptions: tuple[str, ...] = ("telemetry",)
 
     @property
     def send_interval_seconds(self) -> float:
@@ -34,6 +36,8 @@ class Config:
             offline_backoff_seconds=_float_env("OFFLINE_BACKOFF_SECONDS", 1.0),
             log_level=os.getenv("LOG_LEVEL", "INFO"),
             simulate=_bool_env("SIMULATE", False),
+            de_module_name=os.getenv("DE_MODULE_NAME", "wingxtra_de_telemetry"),
+            de_subscriptions=_csv_env("DE_SUBSCRIPTIONS", ("telemetry",)),
         )
 
 
@@ -59,3 +63,11 @@ def _bool_env(name: str, default: bool) -> bool:
     if raw is None:
         return default
     return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _csv_env(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
+    raw = os.getenv(name)
+    if not raw:
+        return default
+    values = tuple(item.strip() for item in raw.split(",") if item.strip())
+    return values or default

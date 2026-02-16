@@ -25,7 +25,12 @@ def main() -> None:
             return map_databus_to_payload(config.drone_id, sim.next())
 
     else:
-        client = DataBusClient(config.de_comm_host, config.de_comm_port)
+        client = DataBusClient(
+            config.de_comm_host,
+            config.de_comm_port,
+            module_name=config.de_module_name,
+            subscriptions=config.de_subscriptions,
+        )
 
         def get_payload() -> dict:
             return map_databus_to_payload(config.drone_id, client.receive())

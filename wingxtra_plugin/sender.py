@@ -21,7 +21,7 @@ class TelemetrySender:
             method="POST",
             headers={
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {self._api_key}",
+                "X-API-Key": self._api_key,
             },
         )
         with request.urlopen(req, timeout=self._timeout) as resp:
