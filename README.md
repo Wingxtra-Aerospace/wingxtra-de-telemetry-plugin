@@ -31,6 +31,7 @@ python main.py
 Notes:
 - In non-simulate mode the plugin expects the official `droneengage_databus` Python client/template to be installed/available.
 - API authentication uses `X-API-Key: <API_KEY>`.
+- Mapper always emits `position` (required by backend `TelemetryIn`) and will normalize common position key variants (`position`, `global_position`, `gps`, `location`).
 
 ## Environment variables
 

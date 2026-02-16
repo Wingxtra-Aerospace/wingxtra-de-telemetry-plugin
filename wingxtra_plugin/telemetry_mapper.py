@@ -13,14 +13,9 @@ def map_databus_to_payload(drone_id: str, data: dict[str, Any]) -> dict[str, Any
         "schema_version": 1,
         "drone_id": drone_id,
         "ts": iso_utc_now(),
+        "position": _extract_position(data),
     }
 
-    if "position" in data:
-        payload["position"] = {
-            "lat": data["position"].get("lat"),
-            "lon": data["position"].get("lon"),
-            "alt_m": data["position"].get("alt_m"),
-        }
     if "attitude" in data:
         payload["attitude"] = {"yaw_deg": data["attitude"].get("yaw_deg")}
     if "velocity" in data:
@@ -39,3 +34,45 @@ def map_databus_to_payload(drone_id: str, data: dict[str, Any]) -> dict[str, Any
         payload["link"] = {"rssi_dbm": data["link"].get("rssi_dbm")}
 
     return payload
+
+
+def _extract_position(data: dict[str, Any]) -> dict[str, Any]:
+    position_candidates = [
+        data.get("position"),
+        data.get("global_position"),
+        data.get("gps"),
+        data.get("location"),
+    ]
+
+    source = next((item for item in position_candidates if isinstance(item, dict)), {})
+
+    lat = _first_available(source, data, keys=("lat", "latitude"))
+    lon = _first_available(source, data, keys=("lon", "lng", "longitude"))
+    alt = _first_available(
+        source,
+        data,
+        keys=("alt_m", "alt", "altitude", "altitude_m", "relative_alt"),
+    )
+
+    return {
+        "lat": _coerce_float(lat, 0.0),
+        "lon": _coerce_float(lon, 0.0),
+        "alt_m": _coerce_float(alt, 0.0),
+    }
+
+
+def _first_available(primary: dict[str, Any], fallback: dict[str, Any], keys: tuple[str, ...]) -> Any:
+    for key in keys:
+        if key in primary and primary[key] is not None:
+            return primary[key]
+    for key in keys:
+        if key in fallback and fallback[key] is not None:
+            return fallback[key]
+    return None
+
+
+def _coerce_float(value: Any, default: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default

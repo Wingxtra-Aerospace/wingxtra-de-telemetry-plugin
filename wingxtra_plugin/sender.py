@@ -38,21 +38,16 @@ def send_loop(
     offline_backoff_seconds: float,
 ) -> None:
     logger = logging.getLogger(__name__)
-    latest_payload: dict[str, Any] | None = None
     failures = 0
 
     while True:
-        if latest_payload is None:
-            latest_payload = get_payload()
-
+        payload = get_payload()
         try:
-            sender.send(latest_payload)
-            latest_payload = None
+            sender.send(payload)
             failures = 0
             time.sleep(send_interval_seconds)
         except Exception as exc:  # intentionally broad for resilience
             failures += 1
             delay = min(30.0, offline_backoff_seconds * (2 ** min(failures, 8)))
             logger.warning("Send failed (%s). Retrying in %.1fs", exc, delay)
-            latest_payload = get_payload()
             time.sleep(delay)
