@@ -1,70 +1,64 @@
 from __future__ import annotations
 
-import pytest
-
 from wingxtra_plugin.databus_client import DataBusClient
+from wingxtra_plugin.databus_lib.messages import (
+    ANDRUAV_PROTOCOL_MESSAGE_CMD,
+    ANDRUAV_PROTOCOL_MESSAGE_TYPE,
+    TYPE_AndruavMessage_GPS,
+    TYPE_AndruavMessage_NAV_INFO,
+    TYPE_AndruavMessage_POWER,
+)
 
 
-class FakeDataBus:
-    def __init__(self) -> None:
+class FakeModule:
+    def __init__(self):
+        self.m_OnReceive = None
         self.connected = False
-        self.registered: str | None = None
-        self.subscriptions: list[str] = []
+        self.init_args = None
+        self.messages: list[dict] = []
 
-    def connect(self) -> None:
+    def defineModule(self, **kwargs):
+        self.defined = kwargs
+
+    def addModuleFeatures(self, feature):
+        self.feature = feature
+
+    def initUDPChannel(self, **kwargs):
+        self.init_args = kwargs
+
+    def connect(self):
         self.connected = True
 
-    def register_module(self, module_name: str) -> None:
-        self.registered = module_name
-
-    def subscribe(self, topic: str) -> None:
-        self.subscriptions.append(topic)
-
-    def receive(self) -> dict[str, object]:
-        return {"state": {"mode": "AUTO"}}
+    def receive_message(self):
+        msg = self.messages.pop(0)
+        if self.m_OnReceive:
+            self.m_OnReceive(msg)
+        return msg
 
 
-class FakeWrappedPayloadBus(FakeDataBus):
-    def receive(self) -> dict[str, object]:
-        return {"payload": {"battery": {"remaining_pct": 99}}}
+def test_databus_client_uses_comm_and_listen_ports_and_updates_state() -> None:
+    fake = FakeModule()
+    fake.messages = [
+        {ANDRUAV_PROTOCOL_MESSAGE_TYPE: TYPE_AndruavMessage_GPS, ANDRUAV_PROTOCOL_MESSAGE_CMD: {"lat": 1.2, "lon": 3.4, "alt": 5.6}},
+        {ANDRUAV_PROTOCOL_MESSAGE_TYPE: TYPE_AndruavMessage_POWER, ANDRUAV_PROTOCOL_MESSAGE_CMD: {"voltage": 22.2, "battery_remaining": 66}},
+        {ANDRUAV_PROTOCOL_MESSAGE_TYPE: TYPE_AndruavMessage_NAV_INFO, ANDRUAV_PROTOCOL_MESSAGE_CMD: {"groundspeed": 12.3, "yaw": 45, "armed": True, "mode": "AUTO"}},
+    ]
 
-
-class FakeBadBus(FakeDataBus):
-    def receive(self) -> str:
-        return "not-json"
-
-
-def test_databus_client_registers_and_subscribes() -> None:
-    fake = FakeDataBus()
     client = DataBusClient(
-        "127.0.0.1",
-        60000,
-        60001,
-        module_name="WX_TELEMETRY",
-        subscriptions=("telemetry",),
-        databus_client=fake,
+        comm_host="127.0.0.1",
+        comm_port=60000,
+        listen_host="0.0.0.0",
+        listen_port=61233,
+        module=fake,
     )
 
-    message = client.receive()
+    payload1 = client.receive()
+    payload2 = client.receive()
+    payload3 = client.receive()
 
-    assert message["state"]["mode"] == "AUTO"
     assert fake.connected is True
-    assert fake.registered == "WX_TELEMETRY"
-    assert fake.subscriptions == ["telemetry"]
-
-
-def test_databus_client_unwraps_payload_field() -> None:
-    fake = FakeWrappedPayloadBus()
-    client = DataBusClient("127.0.0.1", 60000, 60001, databus_client=fake)
-
-    message = client.receive()
-
-    assert message["battery"]["remaining_pct"] == 99
-
-
-def test_databus_client_rejects_non_json_payload() -> None:
-    fake = FakeBadBus()
-    client = DataBusClient("127.0.0.1", 60000, 60001, databus_client=fake)
-
-    with pytest.raises(Exception):
-        client.receive()
+    assert fake.init_args["target_port"] == 60000
+    assert fake.init_args["listen_port"] == 61233
+    assert payload1["position"]["lat"] == 1.2
+    assert payload2["battery"]["remaining_pct"] == 66
+    assert payload3["state"]["mode"] == "AUTO"

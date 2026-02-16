@@ -11,19 +11,8 @@ def test_config_from_env_defaults(monkeypatch):
 
     assert config.de_comm_host == "127.0.0.1"
     assert config.de_comm_port == 60000
-    assert config.de_receive_port == 60001
-    assert config.de_module_name == "WX_TELEMETRY"
-    assert config.de_subscriptions == ("telemetry",)
+    assert config.de_listen_host == "0.0.0.0"
+    assert config.de_listen_port == 61233
+    assert config.de_module_name == "WX_TELEMETRY_SENDER"
     assert config.simulate is False
     assert config.send_hz == 3.0
-
-
-def test_config_parses_subscription_list(monkeypatch):
-    monkeypatch.setenv("DRONE_ID", "WX-DRN-002")
-    monkeypatch.setenv("API_URL", "https://example.com/api/v1/telemetry")
-    monkeypatch.setenv("API_KEY", "secret")
-    monkeypatch.setenv("DE_SUBSCRIPTIONS", "telemetry, attitude ,battery")
-
-    config = Config.from_env()
-
-    assert config.de_subscriptions == ("telemetry", "attitude", "battery")

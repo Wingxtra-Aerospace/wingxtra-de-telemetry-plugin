@@ -26,11 +26,11 @@ def main() -> None:
 
     else:
         client = DataBusClient(
-            config.de_comm_host,
-            config.de_comm_port,
-            config.de_receive_port,
+            comm_host=config.de_comm_host,
+            comm_port=config.de_comm_port,
+            listen_host=config.de_listen_host,
+            listen_port=config.de_listen_port,
             module_name=config.de_module_name,
-            subscriptions=config.de_subscriptions,
         )
 
         def get_payload() -> dict:

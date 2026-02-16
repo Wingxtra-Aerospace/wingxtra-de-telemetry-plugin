@@ -1,128 +1,142 @@
 from __future__ import annotations
 
-import importlib
-import json
+import logging
+import random
+from dataclasses import dataclass, field
 from typing import Any
+
+from .databus_lib.de_module import (
+    MODULE_CLASS_GENERIC,
+    MODULE_FEATURE_RECEIVING_TELEMETRY,
+    CModule,
+)
+from .databus_lib.messages import (
+    ALT_PROTOCOL_MESSAGE_CMD_KEYS,
+    ALT_PROTOCOL_MESSAGE_TYPE_KEYS,
+    ANDRUAV_PROTOCOL_MESSAGE_CMD,
+    ANDRUAV_PROTOCOL_MESSAGE_TYPE,
+    TYPE_AndruavMessage_GPS,
+    TYPE_AndruavMessage_NAV_INFO,
+    TYPE_AndruavMessage_POWER,
+)
+
+
+@dataclass
+class TelemetryState:
+    position: dict[str, Any] = field(default_factory=dict)
+    velocity: dict[str, Any] = field(default_factory=dict)
+    state: dict[str, Any] = field(default_factory=dict)
+    battery: dict[str, Any] = field(default_factory=dict)
+    attitude: dict[str, Any] = field(default_factory=dict)
+    link: dict[str, Any] = field(default_factory=dict)
+
+    def to_payload(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+        for key in ("position", "velocity", "state", "battery", "attitude", "link"):
+            value = getattr(self, key)
+            if value:
+                payload[key] = dict(value)
+        return payload
 
 
 class DataBusClient:
-    """Adapter for the official DroneEngage DataBus Python client/template APIs."""
-
     def __init__(
         self,
-        host: str,
+        comm_host: str,
         comm_port: int,
-        receive_port: int,
-        module_name: str = "WX_TELEMETRY",
-        subscriptions: tuple[str, ...] = ("telemetry",),
-        databus_client: Any | None = None,
+        listen_port: int,
+        listen_host: str = "0.0.0.0",
+        module_name: str = "WX_TELEMETRY_SENDER",
+        module_version: str = "0.1.0",
+        message_filter: list[int] | None = None,
+        module: CModule | None = None,
     ) -> None:
-        self._host = host
-        self._comm_port = comm_port
-        self._receive_port = receive_port
-        self._module_name = module_name
-        self._subscriptions = subscriptions
-        self._client = databus_client
-        self._initialized = False
+        self._logger = logging.getLogger(__name__)
+        self._state = TelemetryState()
+        self._module = module or CModule()
+        self._message_filter = message_filter or [
+            TYPE_AndruavMessage_GPS,
+            TYPE_AndruavMessage_POWER,
+            TYPE_AndruavMessage_NAV_INFO,
+        ]
 
-    def _ensure_connected(self) -> None:
-        if self._client is None:
-            self._client = _load_official_databus_client(
-                host=self._host,
-                comm_port=self._comm_port,
-                receive_port=self._receive_port,
-            )
-
-        if self._initialized:
-            return
-
-        _call_first(self._client, ("connect", "start", "open"))
-        _call_first(self._client, ("register_module", "register", "hello"), self._module_name)
-
-        for topic in self._subscriptions:
-            _call_first(
-                self._client,
-                (
-                    "subscribe",
-                    "add_subscription",
-                    "set_filter",
-                    "filter",
-                ),
-                topic,
-            )
-        self._initialized = True
+        module_key = "".join(str(random.randint(0, 9)) for _ in range(12))
+        self._module.defineModule(
+            module_class=MODULE_CLASS_GENERIC,
+            module_name=module_name,
+            module_key=module_key,
+            module_version=module_version,
+            message_filter=self._message_filter,
+        )
+        self._module.addModuleFeatures(MODULE_FEATURE_RECEIVING_TELEMETRY)
+        self._module.initUDPChannel(
+            target_ip=comm_host,
+            target_port=comm_port,
+            listen_ip=listen_host,
+            listen_port=listen_port,
+            packet_size=8192,
+        )
+        self._module.m_OnReceive = self._on_receive
+        self._module.connect()
 
     def receive(self) -> dict[str, Any]:
-        self._ensure_connected()
-        message = _call_first(
-            self._client,
-            ("receive", "recv", "next_message", "read_message", "get_message"),
-        )
-        parsed = _normalize_message_payload(message)
-        if not isinstance(parsed, dict):
-            raise ValueError("DataBus payload must be a JSON object")
-        return parsed
+        self._module.receive_message()
+        return self._state.to_payload()
+
+    def _on_receive(self, jMsg: dict[str, Any]) -> None:
+        msg_type = jMsg.get(ANDRUAV_PROTOCOL_MESSAGE_TYPE)
+        if msg_type is None:
+            for key in ALT_PROTOCOL_MESSAGE_TYPE_KEYS:
+                if key in jMsg:
+                    msg_type = jMsg[key]
+                    break
+
+        cmd = jMsg.get(ANDRUAV_PROTOCOL_MESSAGE_CMD)
+        if cmd is None:
+            for key in ALT_PROTOCOL_MESSAGE_CMD_KEYS:
+                if key in jMsg:
+                    cmd = jMsg[key]
+                    break
+        if not isinstance(cmd, dict):
+            cmd = {}
+
+        if cmd:
+            self._logger.debug("DataBus message type=%s cmd.keys=%s", msg_type, sorted(cmd.keys()))
+
+        if msg_type == TYPE_AndruavMessage_GPS:
+            self._update_gps(cmd)
+        elif msg_type == TYPE_AndruavMessage_POWER:
+            self._update_power(cmd)
+        elif msg_type == TYPE_AndruavMessage_NAV_INFO:
+            self._update_nav(cmd)
+
+    def _update_gps(self, cmd: dict[str, Any]) -> None:
+        self._state.position = {
+            "lat": _coalesce(cmd, "lat", "latitude", "y"),
+            "lon": _coalesce(cmd, "lon", "lng", "longitude", "x"),
+            "alt_m": _coalesce(cmd, "alt", "alt_m", "altitude", "z"),
+        }
+
+    def _update_power(self, cmd: dict[str, Any]) -> None:
+        self._state.battery = {
+            "voltage_v": _coalesce(cmd, "voltage", "voltage_v", "vbat"),
+            "remaining_pct": _coalesce(cmd, "battery_remaining", "remaining", "remaining_pct"),
+        }
+
+    def _update_nav(self, cmd: dict[str, Any]) -> None:
+        self._state.velocity = {
+            "groundspeed_mps": _coalesce(cmd, "groundspeed", "groundspeed_mps", "speed"),
+        }
+        self._state.attitude = {"yaw_deg": _coalesce(cmd, "yaw", "yaw_deg", "heading")}
+        self._state.state = {
+            "armed": bool(_coalesce(cmd, "armed", default=False)),
+            "mode": _coalesce(cmd, "mode", "flight_mode", default="UNKNOWN"),
+        }
+        self._state.link = {"rssi_dbm": _coalesce(cmd, "rssi", "rssi_dbm", default=None)}
 
 
-def _load_official_databus_client(*, host: str, comm_port: int, receive_port: int) -> Any:
-    candidates = (
-        "droneengage_databus.python.client",
-        "droneengage_databus.client",
-        "droneengage_databus",
-    )
-    last_error: Exception | None = None
-
-    kwargs_variants = (
-        {"host": host, "comm_port": comm_port, "receive_port": receive_port},
-        {"host": host, "port": comm_port, "listen_port": receive_port},
-        {"communicator_host": host, "communicator_port": comm_port, "local_port": receive_port},
-        {"host": host, "port": comm_port},
-    )
-
-    for module_name in candidates:
-        try:
-            module = importlib.import_module(module_name)
-        except Exception as exc:  # pragma: no cover
-            last_error = exc
-            continue
-
-        for ctor_name in ("DataBusClient", "Client", "create_client"):
-            ctor = getattr(module, ctor_name, None)
-            if not callable(ctor):
-                continue
-            for kwargs in kwargs_variants:
-                try:
-                    return ctor(**kwargs)
-                except TypeError:
-                    continue
-
-    raise RuntimeError(
-        "Could not load DroneEngage DataBus Python client/template. "
-        "Install Wingxtra-Aerospace/droneengage_databus python client and configure DE_RECEIVE_PORT."
-    ) from last_error
-
-
-def _call_first(target: Any, names: tuple[str, ...], *args: Any) -> Any:
-    for name in names:
-        fn = getattr(target, name, None)
-        if callable(fn):
-            return fn(*args)
-    if args:
-        raise RuntimeError(f"DataBus client missing required methods. Tried: {', '.join(names)}")
-    return None
-
-
-def _normalize_message_payload(message: Any) -> Any:
-    if isinstance(message, dict):
-        for key in ("payload", "data", "body", "message"):
-            if key in message:
-                message = message[key]
-                break
-        else:
-            return message
-
-    if isinstance(message, (bytes, bytearray)):
-        return json.loads(message.decode("utf-8"))
-    if isinstance(message, str):
-        return json.loads(message)
-    return message
+def _coalesce(data: dict[str, Any], *keys: str, default: Any = None) -> Any:
+    for key in keys:
+        if key in data and data[key] is not None:
+            return data[key]
+    return default
