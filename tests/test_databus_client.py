@@ -7,8 +7,12 @@ from wingxtra_plugin.databus_client import DataBusClient
 
 class FakeDataBus:
     def __init__(self) -> None:
+        self.connected = False
         self.registered: str | None = None
         self.subscriptions: list[str] = []
+
+    def connect(self) -> None:
+        self.connected = True
 
     def register_module(self, module_name: str) -> None:
         self.registered = module_name
@@ -32,18 +36,26 @@ class FakeBadBus(FakeDataBus):
 
 def test_databus_client_registers_and_subscribes() -> None:
     fake = FakeDataBus()
-    client = DataBusClient("127.0.0.1", 60000, module_name="wingxtra", subscriptions=("telemetry",), databus_client=fake)
+    client = DataBusClient(
+        "127.0.0.1",
+        60000,
+        60001,
+        module_name="WX_TELEMETRY",
+        subscriptions=("telemetry",),
+        databus_client=fake,
+    )
 
     message = client.receive()
 
     assert message["state"]["mode"] == "AUTO"
-    assert fake.registered == "wingxtra"
+    assert fake.connected is True
+    assert fake.registered == "WX_TELEMETRY"
     assert fake.subscriptions == ["telemetry"]
 
 
 def test_databus_client_unwraps_payload_field() -> None:
     fake = FakeWrappedPayloadBus()
-    client = DataBusClient("127.0.0.1", 60000, databus_client=fake)
+    client = DataBusClient("127.0.0.1", 60000, 60001, databus_client=fake)
 
     message = client.receive()
 
@@ -52,7 +64,7 @@ def test_databus_client_unwraps_payload_field() -> None:
 
 def test_databus_client_rejects_non_json_payload() -> None:
     fake = FakeBadBus()
-    client = DataBusClient("127.0.0.1", 60000, databus_client=fake)
+    client = DataBusClient("127.0.0.1", 60000, 60001, databus_client=fake)
 
     with pytest.raises(Exception):
         client.receive()

@@ -28,6 +28,7 @@ def main() -> None:
         client = DataBusClient(
             config.de_comm_host,
             config.de_comm_port,
+            config.de_receive_port,
             module_name=config.de_module_name,
             subscriptions=config.de_subscriptions,
         )

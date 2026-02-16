@@ -12,11 +12,12 @@ class Config:
     send_hz: float = 3.0
     de_comm_host: str = "127.0.0.1"
     de_comm_port: int = 60000
+    de_receive_port: int = 60001
     http_timeout_seconds: float = 3.0
     offline_backoff_seconds: float = 1.0
     log_level: str = "INFO"
     simulate: bool = False
-    de_module_name: str = "wingxtra_de_telemetry"
+    de_module_name: str = "WX_TELEMETRY"
     de_subscriptions: tuple[str, ...] = ("telemetry",)
 
     @property
@@ -32,11 +33,12 @@ class Config:
             send_hz=_float_env("SEND_HZ", 3.0),
             de_comm_host=os.getenv("DE_COMM_HOST", "127.0.0.1"),
             de_comm_port=_int_env("DE_COMM_PORT", 60000),
+            de_receive_port=_int_env("DE_RECEIVE_PORT", 60001),
             http_timeout_seconds=_float_env("HTTP_TIMEOUT_SECONDS", 3.0),
             offline_backoff_seconds=_float_env("OFFLINE_BACKOFF_SECONDS", 1.0),
             log_level=os.getenv("LOG_LEVEL", "INFO"),
             simulate=_bool_env("SIMULATE", False),
-            de_module_name=os.getenv("DE_MODULE_NAME", "wingxtra_de_telemetry"),
+            de_module_name=os.getenv("DE_MODULE_NAME", "WX_TELEMETRY"),
             de_subscriptions=_csv_env("DE_SUBSCRIPTIONS", ("telemetry",)),
         )
 
