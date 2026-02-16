@@ -37,7 +37,7 @@ class Config:
 
     @property
     def de_receive_port(self) -> int:
-        """Alias for compatibility with older naming in comments/docs."""
+        """Backward-compatible alias for older naming (prefer `de_listen_port`)."""
         return self.de_listen_port
 
     @classmethod
