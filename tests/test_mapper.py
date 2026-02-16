@@ -8,7 +8,7 @@ def test_map_databus_to_payload_contains_required_root_fields():
     assert payload["drone_id"] == "WX-DRN-001"
     assert payload["state"]["mode"] == "AUTO"
     assert "ts" in payload
-    assert payload["position"] == {"lat": 0.0, "lon": 0.0, "alt_m": 0.0}
+    assert "position" not in payload
 
 
 def test_mapper_supports_alternate_position_keys():

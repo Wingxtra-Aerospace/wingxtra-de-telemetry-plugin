@@ -23,15 +23,17 @@ def test_main_uses_comm_and_listen_ports_in_databus_mode(monkeypatch) -> None:
         de_listen_host="0.0.0.0",
         de_listen_port=61233,
         de_module_name="WX_TELEMETRY_SENDER",
+        de_subscriptions=(1002, 1003, 1036),
     )
 
     class FakeDataBusClient:
-        def __init__(self, comm_host, comm_port, listen_host, listen_port, module_name):
+        def __init__(self, comm_host, comm_port, listen_host, listen_port, module_name, message_filter):
             captured["comm_host"] = comm_host
             captured["comm_port"] = comm_port
             captured["listen_host"] = listen_host
             captured["listen_port"] = listen_port
             captured["module_name"] = module_name
+            captured["message_filter"] = message_filter
 
         def receive(self):
             return {"position": {"lat": 1, "lon": 2, "alt_m": 3}}
@@ -53,4 +55,5 @@ def test_main_uses_comm_and_listen_ports_in_databus_mode(monkeypatch) -> None:
     assert captured["listen_host"] == "0.0.0.0"
     assert captured["listen_port"] == 61233
     assert captured["module_name"] == "WX_TELEMETRY_SENDER"
+    assert captured["message_filter"] == [1002, 1003, 1036]
     assert captured["mapped_drone_id"] == "WX-DRN-001"

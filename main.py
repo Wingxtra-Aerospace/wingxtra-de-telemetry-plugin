@@ -29,8 +29,9 @@ def main() -> None:
             comm_host=config.de_comm_host,
             comm_port=config.de_comm_port,
             listen_host=config.de_listen_host,
-            listen_port=config.de_listen_port,
+            listen_port=config.de_receive_port,
             module_name=config.de_module_name,
+            message_filter=list(config.de_subscriptions),
         )
 
         def get_payload() -> dict:

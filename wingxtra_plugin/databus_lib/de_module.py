@@ -4,7 +4,7 @@ import json
 import logging
 from typing import Any, Callable
 
-from .messages import ANDRUAV_PROTOCOL_MESSAGE_TYPE
+from .messages import ALT_PROTOCOL_MESSAGE_TYPE_KEYS, ANDRUAV_PROTOCOL_MESSAGE_TYPE
 from .udpClient import UdpClient
 
 MODULE_CLASS_GENERIC = "MODULE_CLASS_GENERIC"
@@ -80,7 +80,7 @@ class CModule:
             if not isinstance(message, dict):
                 continue
 
-            msg_type = message.get(ANDRUAV_PROTOCOL_MESSAGE_TYPE)
+            msg_type = _extract_message_type(message)
             if self._message_filter and isinstance(msg_type, int) and msg_type not in self._message_filter:
                 continue
 
@@ -90,3 +90,13 @@ class CModule:
                 except Exception:  # pragma: no cover
                     self._logger.exception("m_OnReceive callback failed")
             return message
+
+
+def _extract_message_type(message: dict[str, Any]) -> Any:
+    msg_type = message.get(ANDRUAV_PROTOCOL_MESSAGE_TYPE)
+    if msg_type is not None:
+        return msg_type
+    for key in ALT_PROTOCOL_MESSAGE_TYPE_KEYS:
+        if key in message:
+            return message[key]
+    return None

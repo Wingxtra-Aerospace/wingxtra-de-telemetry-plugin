@@ -1,12 +1,12 @@
 """DataBus message IDs and protocol field keys."""
 
-# protocol keys
-ANDRUAV_PROTOCOL_MESSAGE_TYPE = "message_type"
-ANDRUAV_PROTOCOL_MESSAGE_CMD = "cmd"
+# protocol keys used by DroneEngage templates
+ANDRUAV_PROTOCOL_MESSAGE_TYPE = "mt"
+ANDRUAV_PROTOCOL_MESSAGE_CMD = "ms"
 
 # common alternates seen in integrations
-ALT_PROTOCOL_MESSAGE_TYPE_KEYS = ("messageType", "type", "mt")
-ALT_PROTOCOL_MESSAGE_CMD_KEYS = ("messageCmd", "message", "payload", "ms")
+ALT_PROTOCOL_MESSAGE_TYPE_KEYS = ("message_type", "messageType", "type")
+ALT_PROTOCOL_MESSAGE_CMD_KEYS = ("cmd", "messageCmd", "message", "payload")
 
 # Message types
 TYPE_AndruavMessage_GPS = 1002

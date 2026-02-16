@@ -13,8 +13,11 @@ def map_databus_to_payload(drone_id: str, data: dict[str, Any]) -> dict[str, Any
         "schema_version": 1,
         "drone_id": drone_id,
         "ts": iso_utc_now(),
-        "position": _extract_position(data),
     }
+
+    position = _extract_position(data)
+    if position is not None:
+        payload["position"] = position
 
     if "attitude" in data:
         payload["attitude"] = {"yaw_deg": data["attitude"].get("yaw_deg")}
@@ -36,7 +39,7 @@ def map_databus_to_payload(drone_id: str, data: dict[str, Any]) -> dict[str, Any
     return payload
 
 
-def _extract_position(data: dict[str, Any]) -> dict[str, Any]:
+def _extract_position(data: dict[str, Any]) -> dict[str, float] | None:
     position_candidates = [
         data.get("position"),
         data.get("global_position"),
@@ -54,10 +57,16 @@ def _extract_position(data: dict[str, Any]) -> dict[str, Any]:
         keys=("alt_m", "alt", "altitude", "altitude_m", "relative_alt"),
     )
 
+    lat_f = _coerce_float(lat)
+    lon_f = _coerce_float(lon)
+
+    if lat_f is None or lon_f is None:
+        return None
+
     return {
-        "lat": _coerce_float(lat, 0.0),
-        "lon": _coerce_float(lon, 0.0),
-        "alt_m": _coerce_float(alt, 0.0),
+        "lat": lat_f,
+        "lon": lon_f,
+        "alt_m": _coerce_float(alt, default=0.0),
     }
 
 
@@ -71,7 +80,7 @@ def _first_available(primary: dict[str, Any], fallback: dict[str, Any], keys: tu
     return None
 
 
-def _coerce_float(value: Any, default: float) -> float:
+def _coerce_float(value: Any, default: float | None = None) -> float | None:
     try:
         return float(value)
     except (TypeError, ValueError):

@@ -37,7 +37,7 @@ Notes:
 - The plugin registers as module class `MODULE_CLASS_GENERIC` with module name `WX_TELEMETRY_SENDER` by default.
 - The plugin connects to communicator port `60000` and listens on its own unique local port (`DE_LISTEN_PORT`, default `61233`).
 - API authentication uses `X-API-Key: <API_KEY>`.
-- Mapper always emits `position` (required by backend `TelemetryIn`) and normalizes common position key variants.
+- Mapper normalizes common position key variants and only emits `position` once valid latitude/longitude are available (avoids fake 0,0 coordinates).
 
 ## Environment variables
 
@@ -53,6 +53,7 @@ Optional:
 - `DE_LISTEN_HOST` (default: `0.0.0.0`)
 - `DE_LISTEN_PORT` (default: `61233`)
 - `DE_MODULE_NAME` (default: `WX_TELEMETRY_SENDER`)
+- `DE_SUBSCRIPTIONS` (default: `1002,1003,1036`)
 - `HTTP_TIMEOUT_SECONDS` (default: `3`)
 - `OFFLINE_BACKOFF_SECONDS` (default: `1`)
 - `LOG_LEVEL` (default: `INFO`)
