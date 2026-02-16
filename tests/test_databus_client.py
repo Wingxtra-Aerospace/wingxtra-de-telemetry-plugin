@@ -62,3 +62,22 @@ def test_databus_client_uses_comm_and_listen_ports_and_updates_state() -> None:
     assert payload1["position"]["lat"] == 1.2
     assert payload2["battery"]["remaining_pct"] == 66
     assert payload3["state"]["mode"] == "AUTO"
+
+
+def test_databus_client_handles_string_message_type_and_mt_ms_keys() -> None:
+    fake = FakeModule()
+    fake.messages = [
+        {"mt": "1002", "ms": {"latitude": 5.6037, "longitude": -0.187, "altitude": 120.3}},
+    ]
+
+    client = DataBusClient(
+        comm_host="127.0.0.1",
+        comm_port=60000,
+        listen_host="0.0.0.0",
+        listen_port=61233,
+        module=fake,
+    )
+
+    payload = client.receive()
+
+    assert payload["position"] == {"lat": 5.6037, "lon": -0.187, "alt_m": 120.3}

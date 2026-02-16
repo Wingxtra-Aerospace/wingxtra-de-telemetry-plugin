@@ -91,6 +91,8 @@ class DataBusClient:
                     msg_type = jMsg[key]
                     break
 
+        msg_type = _normalize_message_type(msg_type)
+
         cmd = jMsg.get(ANDRUAV_PROTOCOL_MESSAGE_CMD)
         if cmd is None:
             for key in ALT_PROTOCOL_MESSAGE_CMD_KEYS:
@@ -140,3 +142,12 @@ def _coalesce(data: dict[str, Any], *keys: str, default: Any = None) -> Any:
         if key in data and data[key] is not None:
             return data[key]
     return default
+
+
+def _normalize_message_type(value: Any) -> int | None:
+    try:
+        if value is None:
+            return None
+        return int(value)
+    except (TypeError, ValueError):
+        return None

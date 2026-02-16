@@ -80,8 +80,8 @@ class CModule:
             if not isinstance(message, dict):
                 continue
 
-            msg_type = _extract_message_type(message)
-            if self._message_filter and isinstance(msg_type, int) and msg_type not in self._message_filter:
+            msg_type = _to_int_or_none(_extract_message_type(message))
+            if self._message_filter and msg_type is not None and msg_type not in self._message_filter:
                 continue
 
             if self.m_OnReceive:
@@ -100,3 +100,12 @@ def _extract_message_type(message: dict[str, Any]) -> Any:
         if key in message:
             return message[key]
     return None
+
+
+def _to_int_or_none(value: Any) -> int | None:
+    try:
+        if value is None:
+            return None
+        return int(value)
+    except (TypeError, ValueError):
+        return None
