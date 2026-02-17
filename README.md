@@ -63,6 +63,15 @@ Optional:
 
 See `deploy/README_DEPLOY.md` and `install.sh` for one-command install + systemd setup.
 
+## Implemented status checklist
+
+- ✅ Sniffing instead of binding communicator port: `SNIFF_MODE=true` uses raw-packet sniffing (`AF_PACKET`) and does **not** bind port `60000`.
+- ✅ Automatic install/startup: `install.sh` + `deploy/wingxtra-telemetry.service` + `deploy/wingxtra-telemetry.env.example` are included.
+- ✅ Packaged dependencies: `pyproject.toml` includes `requests>=2.28` for install-time dependency resolution.
+- ✅ Upstream sniffing logic: `wingxtra_plugin/sniffer.py` includes UDP destination-port JSON extraction.
+- ✅ Service/supervision example: systemd unit included under `deploy/`.
+
+
 ## Tests
 
 ```bash
