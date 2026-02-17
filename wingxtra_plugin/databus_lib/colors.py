@@ -1,0 +1,10 @@
+class bcolors:
+    HEADER = ""
+    OKBLUE = ""
+    OKCYAN = ""
+    OKGREEN = ""
+    WARNING = ""
+    FAIL = ""
+    ENDC = ""
+    BOLD = ""
+    UNDERLINE = ""
