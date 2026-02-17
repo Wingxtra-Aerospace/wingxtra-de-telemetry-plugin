@@ -77,3 +77,15 @@ See `deploy/README_DEPLOY.md` and `install.sh` for one-command install + systemd
 ```bash
 python -m pytest
 ```
+## How to deploy
+
+## Install (one time)
+
+```bash
+git clone https://github.com/Wingxtra-Aerospace/wingxtra-de-telemetry-plugin.git
+cd wingxtra-de-telemetry-plugin
+chmod +x install.sh
+./install.sh
+sudo nano /etc/wingxtra-telemetry.env
+sudo systemctl restart wingxtra-telemetry.service
+```
