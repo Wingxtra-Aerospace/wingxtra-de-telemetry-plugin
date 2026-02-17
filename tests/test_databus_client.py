@@ -50,6 +50,7 @@ def test_databus_client_uses_comm_and_listen_ports_and_updates_state() -> None:
         listen_host="0.0.0.0",
         listen_port=61233,
         module=fake,
+        sniff_mode=False,
     )
 
     payload1 = client.receive()
@@ -76,6 +77,7 @@ def test_databus_client_handles_string_message_type_and_mt_ms_keys() -> None:
         listen_host="0.0.0.0",
         listen_port=61233,
         module=fake,
+        sniff_mode=False,
     )
 
     payload = client.receive()

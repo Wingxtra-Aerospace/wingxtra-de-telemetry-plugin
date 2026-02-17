@@ -35,12 +35,13 @@ def test_main_uses_comm_and_listen_ports_in_databus_mode(monkeypatch) -> None:
             captured["module_name"] = module_name
             captured["message_filter"] = message_filter
 
-        def receive(self):
-            return {"position": {"lat": 1, "lon": 2, "alt_m": 3}}
+        def read_one_databus_message(self):
+            return {"mt": 9102, "ms": {"la": 56037000, "ln": -1870000, "ha": 120.3, "y": 45}}
 
     def fake_send_loop(*, get_payload, sender, send_interval_seconds, offline_backoff_seconds):
         payload = get_payload()
         captured["mapped_drone_id"] = payload["drone_id"]
+        captured["lat"] = payload["position"]["lat"]
         raise _Done()
 
     monkeypatch.setattr(main.Config, "from_env", classmethod(lambda cls: cfg))
@@ -57,3 +58,4 @@ def test_main_uses_comm_and_listen_ports_in_databus_mode(monkeypatch) -> None:
     assert captured["module_name"] == "WX_TELEMETRY_SENDER"
     assert captured["message_filter"] == [1002, 1003, 1036]
     assert captured["mapped_drone_id"] == "WX-DRN-001"
+    assert captured["lat"] == 5.6037

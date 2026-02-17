@@ -18,26 +18,24 @@ export SIMULATE=true
 python main.py
 ```
 
-## Run (DroneEngage DataBus mode)
+## Run (DroneEngage DataBus mode, sniffing)
 
 ```bash
 export DRONE_ID=WX-DRN-001
 export API_URL=https://yourdomain.com/api/v1/telemetry
 export API_KEY=secret
 export SIMULATE=false
-export DE_COMM_HOST=127.0.0.1
+export SNIFF_MODE=true
+export SNIFF_IFACE=lo
 export DE_COMM_PORT=60000
-export DE_LISTEN_HOST=0.0.0.0
-export DE_LISTEN_PORT=61233
 python main.py
 ```
 
 Notes:
-- DataBus library code is vendored under `wingxtra_plugin/databus_lib/` so the plugin is self-contained.
-- The plugin registers as module class `MODULE_CLASS_GENERIC` with module name `WX_TELEMETRY_SENDER` by default.
-- The plugin connects to communicator port `60000` and listens on its own unique local port (`DE_LISTEN_PORT`, default `61233`).
+- DataBus library code is vendored under `wingxtra_plugin/databus_lib/`.
+- In sniff mode, plugin does **not** bind communicator port 60000; it sniffs UDP traffic for that destination port.
+- DataBus processing path accepts only `mt == 9102` with non-null `ms`; `la`/`ln` are converted by `/1e7`.
 - API authentication uses `X-API-Key: <API_KEY>`.
-- Mapper normalizes common position key variants and only emits `position` once valid latitude/longitude are available (avoids fake 0,0 coordinates).
 
 ## Environment variables
 
@@ -54,10 +52,16 @@ Optional:
 - `DE_LISTEN_PORT` (default: `61233`)
 - `DE_MODULE_NAME` (default: `WX_TELEMETRY_SENDER`)
 - `DE_SUBSCRIPTIONS` (default: `1002,1003,1036`)
+- `SNIFF_MODE` (default: `true`)
+- `SNIFF_IFACE` (default: `lo`)
 - `HTTP_TIMEOUT_SECONDS` (default: `3`)
 - `OFFLINE_BACKOFF_SECONDS` (default: `1`)
 - `LOG_LEVEL` (default: `INFO`)
 - `SIMULATE` (default: `false`)
+
+## Deployment
+
+See `deploy/README_DEPLOY.md` and `install.sh` for one-command install + systemd setup.
 
 ## Tests
 

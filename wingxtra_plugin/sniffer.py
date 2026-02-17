@@ -1,110 +1,73 @@
+from __future__ import annotations
+
 import json
 import socket
 import time
-from typing import Optional, Dict, Any
+from typing import Any
 
 
-def _extract_first_json_object(payload: bytes) -> Optional[Dict[str, Any]]:
+def sniff_de_databus_json(port: int, iface: str = "lo", timeout_s: float = 1.0) -> dict[str, Any] | None:
+    """Sniff one UDP JSON payload destined for `port` on `iface`.
+
+    Requires Linux raw socket privileges (root / CAP_NET_RAW).
     """
-    DroneEngage databus UDP payload often contains a JSON object at the start,
-    sometimes followed by binary data. We extract the first JSON object safely.
-    """
-    # Find the first '{'
-    start = payload.find(b"{")
-    if start < 0:
+    try:
+        sock = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.ntohs(0x0003))
+    except OSError:
         return None
 
-    # Balance braces to find end of the first JSON object
-    depth = 0
-    in_str = False
-    esc = False
+    try:
+        sock.bind((iface, 0))
+        sock.settimeout(0.2)
+        deadline = time.time() + timeout_s
 
-    for i in range(start, len(payload)):
-        b = payload[i]
-        if in_str:
-            if esc:
-                esc = False
-            elif b == 92:  # backslash \
-                esc = True
-            elif b == 34:  # quote "
-                in_str = False
-            continue
-
-        if b == 34:  # quote "
-            in_str = True
-            continue
-
-        if b == 123:  # {
-            depth += 1
-        elif b == 125:  # }
-            depth -= 1
-            if depth == 0:
-                blob = payload[start : i + 1]
-                try:
-                    return json.loads(blob.decode("utf-8", errors="strict"))
-                except Exception:
-                    return None
-    return None
-
-
-def sniff_de_databus_json(
-    udp_port: int,
-    iface: str = "lo",
-    timeout_s: float = 1.0,
-) -> Optional[Dict[str, Any]]:
-    """
-    Sniff UDP packets on an interface using a raw socket (Linux).
-    Requires CAP_NET_RAW (or root).
-
-    We filter for UDP destination port == udp_port and return the first parsed JSON dict.
-    """
-    # AF_PACKET gives us ethernet frames. Works on Linux.
-    # Note: On 'lo' interface, you still get frames.
-    s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.ntohs(0x0003))
-    s.bind((iface, 0))
-    s.settimeout(timeout_s)
-
-    deadline = time.time() + timeout_s
-    while time.time() < deadline:
-        try:
-            frame, _addr = s.recvfrom(65535)
-        except socket.timeout:
-            return None
-        except Exception:
-            return None
-
-        # Minimal IPv4 + UDP parsing
-        # Ethernet header is 14 bytes for eth0, but on lo it differs; we search for IPv4 header by protocol marker.
-        # Safer: locate IPv4 header by looking for version nibble 4 and IHL >= 5.
-        for off in (14, 16, 0):  # common offsets
-            if len(frame) < off + 20:
-                continue
-            vihl = frame[off]
-            version = vihl >> 4
-            ihl = (vihl & 0x0F) * 4
-            if version != 4 or ihl < 20:
-                continue
-            proto = frame[off + 9]
-            if proto != 17:  # UDP
+        while time.time() < deadline:
+            try:
+                packet = sock.recv(65535)
+            except socket.timeout:
                 continue
 
-            total_len = int.from_bytes(frame[off + 2 : off + 4], "big")
-            ip_header_end = off + ihl
-            if len(frame) < ip_header_end + 8:
+            payload = _extract_udp_payload_for_dst_port(packet, port)
+            if payload is None:
                 continue
 
-            dst_port = int.from_bytes(frame[ip_header_end + 2 : ip_header_end + 4], "big")
-            if dst_port != udp_port:
+            try:
+                decoded = json.loads(payload.decode("utf-8", errors="ignore"))
+            except json.JSONDecodeError:
                 continue
+            if isinstance(decoded, dict):
+                return decoded
+        return None
+    finally:
+        sock.close()
 
-            udp_payload_start = ip_header_end + 8
-            udp_payload_end = off + total_len
-            if udp_payload_end <= udp_payload_start or udp_payload_end > len(frame):
-                udp_payload_end = len(frame)
 
-            payload = frame[udp_payload_start:udp_payload_end]
-            obj = _extract_first_json_object(payload)
-            if obj is not None:
-                return obj
+def _extract_udp_payload_for_dst_port(packet: bytes, dst_port: int) -> bytes | None:
+    if len(packet) < 42:
+        return None
+    eth_proto = int.from_bytes(packet[12:14], "big")
+    if eth_proto != 0x0800:  # IPv4 only
+        return None
 
-    return None
+    ip_start = 14
+    if len(packet) < ip_start + 20:
+        return None
+    ihl = (packet[ip_start] & 0x0F) * 4
+    protocol = packet[ip_start + 9]
+    if protocol != 17:  # UDP
+        return None
+
+    udp_start = ip_start + ihl
+    if len(packet) < udp_start + 8:
+        return None
+
+    dst = int.from_bytes(packet[udp_start + 2 : udp_start + 4], "big")
+    if dst != dst_port:
+        return None
+
+    udp_len = int.from_bytes(packet[udp_start + 4 : udp_start + 6], "big")
+    payload_start = udp_start + 8
+    payload_end = payload_start + max(0, udp_len - 8)
+    if payload_end > len(packet):
+        payload_end = len(packet)
+    return packet[payload_start:payload_end]

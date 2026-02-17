@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import random
 from dataclasses import dataclass, field
 from typing import Any
@@ -19,6 +20,7 @@ from .databus_lib.messages import (
     TYPE_AndruavMessage_NAV_INFO,
     TYPE_AndruavMessage_POWER,
 )
+from .sniffer import sniff_de_databus_json
 
 
 @dataclass
@@ -50,6 +52,7 @@ class DataBusClient:
         module_version: str = "0.1.0",
         message_filter: list[int] | None = None,
         module: CModule | None = None,
+        sniff_mode: bool | None = None,
     ) -> None:
         self._logger = logging.getLogger(__name__)
         self._state = TelemetryState()
@@ -60,6 +63,11 @@ class DataBusClient:
             TYPE_AndruavMessage_NAV_INFO,
         ]
 
+        env_sniff = os.getenv("SNIFF_MODE", "true").lower() in ("1", "true", "yes")
+        self._sniff_mode = env_sniff if sniff_mode is None else sniff_mode
+        self._sniff_port = int(os.getenv("DE_COMM_PORT", str(comm_port)))
+        self._sniff_iface = os.getenv("SNIFF_IFACE", "lo")
+
         module_key = "".join(str(random.randint(0, 9)) for _ in range(12))
         self._module.defineModule(
             module_class=MODULE_CLASS_GENERIC,
@@ -69,18 +77,28 @@ class DataBusClient:
             message_filter=self._message_filter,
         )
         self._module.addModuleFeatures(MODULE_FEATURE_RECEIVING_TELEMETRY)
-        self._module.initUDPChannel(
-            target_ip=comm_host,
-            target_port=comm_port,
-            listen_ip=listen_host,
-            listen_port=listen_port,
-            packet_size=8192,
-        )
         self._module.m_OnReceive = self._on_receive
-        self._module.connect()
+
+        if not self._sniff_mode:
+            self._module.initUDPChannel(
+                target_ip=comm_host,
+                target_port=comm_port,
+                listen_ip=listen_host,
+                listen_port=listen_port,
+                packet_size=8192,
+            )
+            self._module.connect()
+
+    def read_one_databus_message(self) -> dict[str, Any] | None:
+        if self._sniff_mode:
+            return sniff_de_databus_json(self._sniff_port, iface=self._sniff_iface, timeout_s=1.0)
+        return self._module.receive_message()
 
     def receive(self) -> dict[str, Any]:
-        self._module.receive_message()
+        message = self.read_one_databus_message()
+        if message is None:
+            return self._state.to_payload()
+        self._on_receive(message)
         return self._state.to_payload()
 
     def _on_receive(self, jMsg: dict[str, Any]) -> None:

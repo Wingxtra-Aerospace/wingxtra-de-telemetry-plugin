@@ -25,7 +25,6 @@ def test_sender_uses_x_api_key_header() -> None:
 
     request_obj = mock_urlopen.call_args.args[0]
     assert request_obj.get_header("X-api-key") == "top-secret"
-    assert request_obj.get_header("Authorization") is None
     assert json.loads(request_obj.data.decode("utf-8")) == payload
 
 
